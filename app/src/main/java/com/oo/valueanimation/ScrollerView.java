@@ -1,12 +1,6 @@
 package com.oo.valueanimation;
 
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
-import android.graphics.Rect;
-import android.graphics.Shader;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -14,6 +8,7 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.widget.LinearLayout;
 import android.widget.OverScroller;
 import android.widget.Scroller;
 
@@ -21,7 +16,7 @@ import android.widget.Scroller;
  * Created by zhuxiaolong on 2018/1/29.
  */
 
-public class ScrollerView extends View {
+public class ScrollerView extends LinearLayout {
     private final String TAG = getClass().getSimpleName();
     private Object mMaximumVelocity;
 
@@ -35,6 +30,7 @@ public class ScrollerView extends View {
 
     public ScrollerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        setOrientation(VERTICAL);
         init(context);
     }
 
@@ -42,6 +38,7 @@ public class ScrollerView extends View {
     private VelocityTracker mVelocityTracker;
     private Scroller mScroller;
     private OverScroller mOverScroller;
+    private float mTouchSlop;
 
 
     private void init(Context context) {
@@ -49,52 +46,75 @@ public class ScrollerView extends View {
         mVelocityTracker = VelocityTracker.obtain();
         mScroller = new Scroller(context);
         mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
+        mTouchSlop = configuration.getScaledTouchSlop();
     }
+
 
     @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        childPosition();
+    }
 
-        int[] colors={Color.RED,Color.GREEN,Color.YELLOW,Color.BLACK};
-        Shader shader=new LinearGradient(0,0,getMeasuredWidth(),getMeasuredHeight(),colors,null, Shader.TileMode.CLAMP);
+    private void childPosition() {
+        int childCount = getChildCount();
+        if (childCount > 0) {
+            for (int i = 0; i < childCount; i++) {
+                View child = getChildAt(i);
+            }
+        }
+    }
 
-        Rect rect=new Rect(0,0,getMeasuredWidth(),getMeasuredHeight());
-        Paint paint=new Paint();
-        paint.setShader(shader);
-        canvas.drawRect(rect,paint);
+    private int getTargetChild(float currentY) {
+        int childCount = getChildCount();
+        int targetIndex = 0;
+        if (childCount > 0) {
+            for (int i = 0; i < childCount; i++) {
+                View child = getChildAt(i);
+                int middle = child.getTop() + child.getBottom();
+                if (currentY > middle) {
+                    targetIndex = i;
+                }
+            }
+        }
+        return targetIndex;
     }
 
 
-    enum DIR{
-        UP_DIR,DOWN_DIR
-    }
-    DIR mDIR;
-    float downY=0;
+    float downY = 0;
 
     boolean dir;
+    float currentY;
+
+
+    private void smoothScrollBy(int x, int y, int offset) {
+        mScroller.startScroll(x, y, x, y + offset);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         mVelocityTracker.addMovement(event);
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
 
-                downY=event.getY();
-
+                downY = event.getY();
+                currentY = downY;
                 break;
             case MotionEvent.ACTION_MOVE:
+                float diffY = event.getY() - currentY;
+                Log.i(TAG, "onTouchEvent: move diffY=" + diffY + "  mTouchSlop=" + mTouchSlop);
 
-                if (event.getY()-downY>0) {
-                    dir=true;
-                }else {
-                    dir=false;
-                }
-
+                scrollBy(0, (int) (-(diffY)));
+                currentY = event.getY();
                 break;
             case MotionEvent.ACTION_UP:
                 Log.i(TAG, "onTouchEvent: UP ");
-                mVelocityTracker.computeCurrentVelocity(1000,1000);
-                mScroller.startScroll(getScrollX(),getScrollY(),0,dir?500:-500,500);
-                invalidate();
+//                int targetChild = getTargetChild(event.getY());
+//                float currentY = event.getY();
+//                float targetScrollY = getChildAt(targetChild).getScrollY();
+//                mVelocityTracker.computeCurrentVelocity(1000, 1000);
+//                mScroller.startScroll(getScrollX(), getScrollY(), 0, (int) (dir ? (targetScrollY - currentY) : (currentY - targetScrollY)), 500);
+//                invalidate();
                 break;
             default:
                 break;
@@ -111,7 +131,7 @@ public class ScrollerView extends View {
             Log.i(TAG, "computeScroll: curX :" + mScroller.getCurrX() + "  curY : " + mScroller.getCurrY());
             scrollTo(mScroller.getCurrX(), mScroller.getCurrY());
 //        重绘
-            invalidate();
+            postInvalidateOnAnimation();
         }
         super.computeScroll();
     }
